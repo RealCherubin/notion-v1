@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,18 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+                notion: {
+                    text: '#37352f',
+                    lightText: '#6B6B6B',
+                    background: '#ffffff',
+                    sidebarBackground: '#fbfbfa',
+                    sidebarText: '#37352f',
+                    sidebarBorder: '#ebebea',
+                    hover: '#ebebea',
+                    divider: '#e3e2e1',
+                    accent: '#2383e2'
+                }
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
