@@ -1,5 +1,4 @@
-
-import { NotepadLayout } from '@/components/NotepadLayout';
+import { NotepadLayout } from '@/components/layout/NotepadLayout';
 
 const Index = () => {
   return <NotepadLayout />;

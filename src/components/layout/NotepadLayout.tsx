@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Editor } from './Editor';
+import { Editor } from '../editor/Editor';
 import { cn } from '@/lib/utils';
 
 interface NotepadLayoutProps {
