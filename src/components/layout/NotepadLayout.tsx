@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Editor } from '../editor/Editor';
 import { cn } from '@/lib/utils';
+import { FAKE_WORKSPACE_DATA } from '@/data/fakeWorkspaceData';
 
 interface NotepadLayoutProps {
   className?: string;
@@ -9,11 +10,8 @@ interface NotepadLayoutProps {
 
 export function NotepadLayout({ className }: NotepadLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [currentNote, setCurrentNote] = useState({
-    id: '1',
-    title: 'Welcome to Notion-like',
-    content: "This is your first note. Start typing to edit it.\n\nYou can use the microphone icon to dictate text."
-  });
+  // Use the first page as the initial note
+  const [currentNote, setCurrentNote] = useState(FAKE_WORKSPACE_DATA[0]);
   
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);

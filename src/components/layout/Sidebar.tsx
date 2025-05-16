@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   ChevronLeft, 
@@ -10,11 +9,15 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { FAKE_WORKSPACE_DATA } from '@/data/fakeWorkspaceData';
 
 interface Note {
   id: string;
   title: string;
-  content: string;
+  content?: string[] | string;
+  columns?: string[];
+  rows?: any[];
+  type?: string;
 }
 
 interface SidebarProps {
@@ -25,12 +28,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isCollapsed, toggleSidebar, currentNoteId, setCurrentNote }: SidebarProps) {
-  // Mock data for notes
-  const sampleNotes: Note[] = [
-    { id: '1', title: 'Welcome to Notion-like', content: "This is your first note. Start typing to edit it.\n\nYou can use the microphone icon to dictate text." },
-    { id: '2', title: 'Meeting notes', content: "Team meeting agenda:\n- Project updates\n- Upcoming deadlines\n- Questions" },
-    { id: '3', title: 'Ideas', content: "New project ideas:\n1. Mobile app\n2. Desktop integration\n3. Voice commands" },
-  ];
+  // Use FAKE_WORKSPACE_DATA for pages
+  const pages: Note[] = FAKE_WORKSPACE_DATA;
 
   return (
     <div 
@@ -105,7 +104,7 @@ export function Sidebar({ isCollapsed, toggleSidebar, currentNoteId, setCurrentN
           </div>
           
           <div className="mt-1">
-            {sampleNotes.map((note) => (
+            {pages.map((note) => (
               <div 
                 key={note.id}
                 className={cn(
