@@ -4,6 +4,7 @@ import { useHotkey } from '@/hooks/useHotkey';
 import { usePauseFriction } from '@/hooks/usePauseFriction';
 import { BubbleItem } from './BubbleItem';
 import { cn } from '@/lib/utils';
+import { FAKE_WORKSPACE_DATA } from '@/data/fakeWorkspaceData';
 
 // --- Types ---
 interface Note {
@@ -41,6 +42,61 @@ function getUniqueId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
 
+// Utility: Extract keywords from a string
+function extractKeywords(text: string): string[] {
+  return Array.from(
+    new Set(
+      text
+        .toLowerCase()
+        .split(/\W+/)
+        .filter(word => word.length > 3)
+    )
+  );
+}
+
+// Utility: Filter workspace context for items containing any of the keywords
+function filterWorkspaceContextByKeywords(workspaceData: any[], keywords: string[]) {
+  const allTextItems = [];
+  for (const item of workspaceData) {
+    if (item.type === 'note' && Array.isArray(item.content)) {
+      allTextItems.push({ ...item, text: item.content.join(' ') });
+    } else if (item.type === 'table' && Array.isArray(item.rows)) {
+      for (const row of item.rows) {
+        allTextItems.push({ ...item, text: row.join(' ') });
+      }
+    }
+  }
+  return allTextItems.filter(item =>
+    keywords.some(kw => item.text.toLowerCase().includes(kw))
+  );
+}
+
+// Add a helper to build CherubinContext with workspaceContext
+function buildCherubinContext(currentParagraph: string, previousParagraph: string, setLastExtractedContext: any): CherubinContext {
+  const keywords = extractKeywords(currentParagraph);
+  const filteredContext = filterWorkspaceContextByKeywords(FAKE_WORKSPACE_DATA, keywords);
+  const contextSummary = filteredContext.slice(0, 3).map(item =>
+    `Type: ${item.type}\nTitle: ${item.title || ''}\nContent: ${item.text}\n`
+  ).join('\n---\n');
+  setLastExtractedContext({
+    currentParagraph,
+    previousParagraph,
+    keywords,
+    workspaceContext: contextSummary,
+  });
+  return {
+    currentParagraph,
+    previousParagraph,
+    workspaceContext: contextSummary,
+  };
+}
+
+// Utility: Get first N words
+function getFirstNWords(text: string, n: number) {
+  const words = text.split(/\s+/);
+  return words.slice(0, n).join(' ') + (words.length > n ? '...' : '');
+}
+
 // --- Main Editor Component ---
 export function Editor({ note, setNote, className }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -59,6 +115,14 @@ export function Editor({ note, setNote, className }: EditorProps) {
     suggestion: string;
     position: { left: number; top: number; caretHeight: number };
   }>({ visible: false, suggestion: '', position: { left: 0, top: 0, caretHeight: 0 } });
+  const [lastExtractedContext, setLastExtractedContext] = useState({
+    currentParagraph: '',
+    previousParagraph: '',
+    keywords: [],
+    workspaceContext: '',
+  });
+  const [showContextDetails, setShowContextDetails] = useState(false);
+  const [modalExpanded, setModalExpanded] = useState(false);
 
   // --- Bubble Logic ---
   const addBubble = (text: string, suggestionType?: string): string => {
@@ -74,37 +138,22 @@ export function Editor({ note, setNote, className }: EditorProps) {
       }
     }
     const newBubble: Bubble = {
-      id: getUniqueId(),
-      position: { left, top },
-      text,
-      createdAt: Date.now(),
-      expanded: false,
+        id: getUniqueId(),
+        position: { left, top },
+        text,
+        createdAt: Date.now(),
+        expanded: false,
       suggestionType,
     };
     setBubbles(prev => [...prev, newBubble]);
     return newBubble.id;
   };
 
-  // --- AI Suggestion Trigger ---
-  const triggerSmartBubble = async (triggeredByTimer: boolean = false) => {
-    const fullContent = contentRef.current?.innerText || '';
-    const { currentParagraph, previousParagraph } = getStructuredContext(fullContent);
-    const lastSentence = getLastSentence(currentParagraph);
-    if (!lastSentence) return;
-    const context: CherubinContext = { currentParagraph, previousParagraph };
-    setDebug(d => ({ ...d, apiInProgress: true }));
-    const { suggestion, aiResponseType } = await getCherubinSuggestion(context, triggeredByTimer ? 'pause' : 'hotkey', setDebug);
-    setDebug(d => ({ ...d, apiInProgress: false }));
-    if (suggestion) {
-      addBubble(suggestion, aiResponseType);
-    }
-  };
-
   // --- Hotkey: Cmd+I or Ctrl+I triggers Cherubin modal ---
   useHotkey('i', async () => {
     const content = contentRef.current?.innerText || '';
     const { currentParagraph, previousParagraph } = getStructuredContext(content);
-    const context: CherubinContext = { currentParagraph, previousParagraph };
+    const context = buildCherubinContext(currentParagraph, previousParagraph, setLastExtractedContext);
     let left = 300, top = 200, caretHeight = 24;
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
@@ -127,7 +176,7 @@ export function Editor({ note, setNote, className }: EditorProps) {
   const pauseFrictionTrigger = async () => {
     const content = contentRef.current?.innerText || '';
     const { currentParagraph, previousParagraph } = getStructuredContext(content);
-    const context: CherubinContext = { currentParagraph, previousParagraph };
+    const context = buildCherubinContext(currentParagraph, previousParagraph, setLastExtractedContext);
     const { suggestion } = await getCherubinSuggestion(context, 'pause', setDebug);
     if (suggestion) addBubble(suggestion, 'CherubinPause');
   };
@@ -140,12 +189,12 @@ export function Editor({ note, setNote, className }: EditorProps) {
 
   // --- Main Render ---
   return (
-    <div
+    <div 
       ref={editorRef}
       className={cn("relative h-full overflow-y-auto px-4 md:px-16 py-12", className)}
     >
       {/* Title */}
-      <div
+      <div 
         ref={titleRef}
         contentEditable
         className="notion-editor text-4xl font-bold mb-4 outline-none"
@@ -155,15 +204,15 @@ export function Editor({ note, setNote, className }: EditorProps) {
         onInput={handleInput}
       />
       {/* Content */}
-      <div
-        ref={contentRef}
-        contentEditable
-        className="notion-editor prose max-w-full"
-        data-placeholder="Start writing..."
-        suppressContentEditableWarning
+        <div 
+          ref={contentRef}
+          contentEditable
+          className="notion-editor prose max-w-full"
+          data-placeholder="Start writing..."
+          suppressContentEditableWarning
         onBlur={() => setNote({ ...note, content: contentRef.current?.innerHTML || '' })}
-        onInput={handleInput}
-      />
+          onInput={handleInput}
+        />
       {/* AI Suggestion Bubbles */}
       {bubbles.map(bubble => (
         <BubbleItem
@@ -188,43 +237,74 @@ export function Editor({ note, setNote, className }: EditorProps) {
         <div
           style={{
             position: 'absolute',
-            left: cherubinModal.position.left - 160,
-            top: cherubinModal.position.top - 72,
-            width: 320,
-            minHeight: 64,
-            background: '#23272f',
-            color: 'white',
+            left: cherubinModal.position.left,
+            top: cherubinModal.position.top - (modalExpanded ? 80 : 32),
+            background: '#d4d4d4',
             borderRadius: 16,
-            border: '1.5px solid #38bdf8',
-            boxShadow: '0 8px 32px rgba(30,41,59,0.18)',
-            padding: '28px 32px 24px 32px',
-            zIndex: 2000,
+            padding: '0 10px',
+            minHeight: modalExpanded ? 80 : 32,
+            minWidth: 180,
+            maxWidth: 320,
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.1em',
+            boxShadow: 'none',
+            border: 'none',
+            zIndex: 2000,
+            fontSize: '10px',
             fontWeight: 500,
+            color: '#111',
+            transition: 'min-width 0.2s, min-height 0.2s',
           }}
         >
-          <div style={{ marginBottom: 16, textAlign: 'center', whiteSpace: 'pre-wrap' }}>
-            {cherubinModal.suggestion || 'No suggestion.'}
-          </div>
-          <button
-            onClick={() => setCherubinModal(m => ({ ...m, visible: false }))}
+          {/* Circle Icon */}
+          <div
             style={{
-              marginTop: 8,
-              background: '#38bdf8',
-              color: '#23272f',
-              border: 'none',
-              borderRadius: 8,
-              padding: '8px 24px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontSize: '1em'
+              width: 8,
+              height: 8,
+              background: '#222',
+              borderRadius: '50%',
+              marginRight: 8,
+              marginLeft: -6,
+            }}
+          />
+          {/* Suggestion Text */}
+          <div
+            style={{
+              flex: 1,
+              lineHeight: 1.1,
+              letterSpacing: '-0.02em',
+              overflow: 'hidden',
+              whiteSpace: modalExpanded ? 'pre-wrap' : 'nowrap',
+              textOverflow: 'ellipsis',
+              fontSize: '10px',
+              transition: 'font-size 0.2s',
             }}
           >
-            Close
+            {modalExpanded
+              ? getFirstNWords(cherubinModal.suggestion || '', 30)
+              : getFirstNWords(cherubinModal.suggestion || '', 5)}
+          </div>
+          {/* Expand Icon */}
+          <button
+            onClick={() => setModalExpanded(e => !e)}
+            style={{
+              width: 18,
+              height: 18,
+              background: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 8,
+              cursor: 'pointer',
+              fontSize: 12,
+              color: '#888',
+              boxShadow: 'none',
+            }}
+            title={modalExpanded ? 'Collapse' : 'Expand'}
+          >
+            <span style={{ fontSize: 12 }}>{modalExpanded ? '🗕' : '↗'}</span>
           </button>
         </div>
       )}
@@ -240,14 +320,28 @@ export function Editor({ note, setNote, className }: EditorProps) {
         fontSize: 12,
         zIndex: 9999,
         minWidth: 260,
-        maxWidth: 400,
+        maxWidth: showContextDetails ? 800 : 400,
         boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
         fontFamily: 'monospace',
         opacity: 0.95,
-        maxHeight: '60vh',
+        maxHeight: showContextDetails ? '90vh' : '60vh',
         overflowY: 'auto',
       }}>
         <div><b>AI Debug Dashboard</b></div>
+        <button onClick={() => setShowContextDetails(s => !s)} style={{margin:'8px 0',padding:'4px 8px',borderRadius:4,background:'#334155',color:'#fff',border:'none',cursor:'pointer'}}>
+          {showContextDetails ? 'Hide' : 'Show'} Extracted Context
+        </button>
+        {showContextDetails && (
+          <div style={{ background: '#222', color: '#fff', padding: 8, borderRadius: 4, marginTop: 8, maxHeight: '60vh', overflowY: 'auto' }}>
+            <div><b>Current Paragraph:</b> <pre>{lastExtractedContext.currentParagraph}</pre></div>
+            <div><b>Previous Paragraph:</b> <pre>{lastExtractedContext.previousParagraph}</pre></div>
+            <div><b>Keywords:</b> {lastExtractedContext.keywords.join(', ')}</div>
+            <div>
+              <b>Workspace Context:</b>
+              <pre>{lastExtractedContext.workspaceContext}</pre>
+          </div>
+        </div>
+        )}
         <div>API in progress: {debug.apiInProgress ? 'Yes' : 'No'}</div>
         <div>Last AI response: <span style={{ color: '#38bdf8' }}>{debug.lastAIResponse}</span></div>
         <div>AI response type: <span style={{ color: '#fbbf24' }}>{debug.aiResponseType}</span></div>

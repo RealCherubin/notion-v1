@@ -25,3 +25,5 @@ dist-ssr
 
 # Environment variables
 .env
+
+VITE_OPENAI_API_KEY=sk-...your_openai_key_here...
