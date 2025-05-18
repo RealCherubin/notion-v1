@@ -1,4 +1,5 @@
 import { getOpenAIApiKey } from '@/lib/utils';
+import { FAKE_WORKSPACE_DATA } from '@/data/fakeWorkspaceData';
 
 export interface CherubinContext {
   currentParagraph: string;
